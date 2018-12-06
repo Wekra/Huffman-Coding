@@ -105,7 +105,18 @@ encode table (x:xs) = case (Map.lookup x table) of
 
 -- Assignement 6
 decode :: HTree -> [Bit] -> String
-decode 
+decode _ [] = ""
+decode (HLeaf _ _ ) _ = error "Huffman tree only consist of one leaf"
+decode rootTree array = reverse(decodeWithString rootTree array "")
+    where  
+        decodeWithString :: HTree -> [Bit] -> String -> String   
+        decodeWithString (HLeaf letter _) array string = decodeWithString rootTree array (letter:string)
+        decodeWithString (HNode _ treeLeft treeRight) (bit:array) string = 
+            if bit == Zero
+                then decodeWithString treeLeft array string
+                else decodeWithString treeRight array string
+        decodeWithString _ [] string = string
+
 
 -- Tests
 testIsConsistent :: Assertion
@@ -127,10 +138,15 @@ testEncode =
         assertEqual "encode empty String" [] (encode codingTableExampleTree "")
         --assertEqual "error on invalid input" (encode codingTableExampleTree "ENTO") -- needs refactoring
 
+testDecode :: Assertion
+testDecode = 
+    do  assertEqual "Correct decoding ENTE" "ENTE" (decode exampleTree [Zero,Zero,Zero,One,Zero,One,One,Zero,Zero,Zero])
+        assertEqual "decode empty array" "" (decode exampleTree [])
+
 
 {--allTests :: Assertion
 allTests = 
     do testIsConsistent --}
 
 allTests :: Test
-allTests = TestList [TestCase testIsConsistent, TestCase testCodingTable, TestCase testEncode]
+allTests = TestList [TestCase testIsConsistent, TestCase testCodingTable, TestCase testEncode, TestCase testDecode]
