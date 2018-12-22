@@ -28,7 +28,7 @@ type Worklist = IntMap.IntMap [HTree]
 type CodingTableAsListWithInts = [(Char, [Int])]
 
 data FileContent = Elements {codingTable :: CodingTableAsListWithInts, encodedString :: ByteString }
-    deriving (Show) -- if the Word8 creation would work, the encodedString would be of type ByteString
+    deriving (Show)
 
 instance Binary FileContent where
     put (Elements codingTable encodedString) = do
@@ -218,14 +218,11 @@ encodeFileCustom pathToFile = do
         print "Encode Input content..."
         let encodedFileContent = encodeString constructedCodingTable fileContents
         print "Done"
-        --let encodedFileContentBools = bitToBool encodedFileContent
         print "Convert coding table into a list of (Char, [Int]) tuples..."
         let codingTableWithInts = changeBitToInt constructedCodingTable
         print "Done"
         print "Compress encoded input string into a list of Word8 elements"
-        --let contentToEncode = Elements codingTableWithInts (bitToInt encodedFileContent) 
-        {-- if the bitsToWord8 function would work on lists containing n % 8 != 0 bits, the line above would read--}
-        let contentToEncode = Elements codingTableWithInts (pack (bitsToWord8 encodedFileContent)) --}
+        let contentToEncode = Elements codingTableWithInts (pack (bitsToWord8 encodedFileContent))
         print "Done"
         let fileNameCompressed = pathToFile ++ ".comp"
         print ("Write coding table and compressed input to file \"" ++ fileNameCompressed ++ "\"...")
@@ -250,11 +247,6 @@ groupBitsIn8 count array
             then (take count array) : (groupBitsIn8 count (drop count array))
             else groupBitsIn8 count (array ++ [Zero])
     | otherwise = error "Negative count"
-
---groupBitsIn8 :: Int -> [Bit] -> [[Bit]]
---groupBitsIn8 _ [] = []
---groupBitsIn8 n array = as : groupBitsIn8 n bs
---    where (as, bs) = splitAt n array
 
 bitsToWord8 :: [Bit] -> [Word8]
 bitsToWord8 bits = map createWord8 (groupBitsIn8 8 bits)
@@ -282,15 +274,25 @@ bitToBool (bit:remainingBits) =
 
 decodeFileCustom :: FilePath -> IO ()
 decodeFileCustom pathToFile = do
+    print ("Read file \"" ++ pathToFile ++ "\" ...")
     readData <- decodeFile pathToFile
     let decodedFileContent = readData :: FileContent
+    print "Done"
+    print "Unpack and recreate coding table ..."
     let codingTableFromFile = changeIntToBit (codingTable decodedFileContent)
-    --let encodedStringFromFile = intToBit (encodedString decodedFileContent)
-    {--same comment as in the encode function: if the word8 creation would work as intended, the line above would read --}
-    let encodedStringFromFile = word8ToBits (unpack (encodedString decodedFileContent))    --}
+    print "Done"
+    print "Decompress original String ..."
+    let encodedStringFromFile = word8ToBits (unpack (encodedString decodedFileContent))
+    print "Done"
+    print "Rebuild Huffmann tree from coding table ..."
     let usedTree = toDecodeTree codingTableFromFile
+    print "Done"
+    print "Decode original String ..."
     let originalString = decodeBitSequence usedTree encodedStringFromFile
-    writeFile "file2.txt" originalString
+    print "Done"
+    let fileNameRecreatedString = (pathToFile ++ ".txt")
+    print ("Write decoded String into file \"" ++ fileNameRecreatedString ++ "\" ...")
+    writeFile fileNameRecreatedString originalString
 
 replaceBitArrayWithIntArray :: (Char, [Bit]) -> (Char, [Int])
 replaceBitArrayWithIntArray (character, bitArray) = (character, bitToInt bitArray)
