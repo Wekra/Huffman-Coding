@@ -1,7 +1,8 @@
-import           Data.Binary
-import           Data.Bits
-import Data.ByteString (pack, unpack)
-import qualified Data.ByteString as ByteString
+import Data.Binary
+import           Data.Binary        (decodeFile, encodeFile)
+import           Data.Bits          (Bits ((.&.), (.|.)))
+import           Data.ByteString    (pack, unpack)
+import qualified Data.ByteString    as ByteString
 import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict    as Map
 import           System.IO
@@ -225,11 +226,16 @@ changeIntToBit tableAsIntList = do
         let tableAsList = map replaceIntArrayWithBitArray tableAsIntList
         Map.fromList tableAsList
 
+--groupBitsIn8 :: Int -> [Bit] -> [[Bit]]
+--groupBitsIn8 _ []    = []
+--groupBitsIn8 count array
+--    | count > 0 = (take count array) : (groupBitsIn8 count (drop count array))
+--    | otherwise = error "Negative count"
+
 groupBitsIn8 :: Int -> [Bit] -> [[Bit]]
-groupBitsIn8 _ []    = []
-groupBitsIn8 count array 
-    | count > 0 = (take count array) : (groupBitsIn8 8 (drop count array))
-    | otherwise = error "Negative count"
+groupBitsIn8 _ [] = []
+groupBitsIn8 n array = as : groupBitsIn8 n bs
+    where (as, bs) = splitAt n array
 
 bitsToWord8 :: [Bit] -> [Word8]
 bitsToWord8 bits = map createWord8 (groupBitsIn8 8 bits)
@@ -247,19 +253,6 @@ word8ToBits words = concat (map dissectWord8 words)
             where
                 b z = if (word .&. z == 0) then Zero else One
 
-{--encodeList [] = return ()
-encodeList (x:xs) = do
-        let tuple = head (x:xs)
-        encodeTuple tuple
-        encodeList xs--}
-
-{--encodeTuple :: (Char, [Int]) -> B.Put
-encodeTuple (char, bits) = do
-    P.putCharUtf8 char
-    B.put bits--}
-
---packBoolToWord8 (b1:b2:b3:b4:b5:b6:b7:b8:remainingBits) = [BW.packWord8BE b1 b2 b3 b4 b5 b6 b7 b8] ++ packBoolToWord8 remainingBits
-
 bitToBool :: [Bit] -> [Bool]
 bitToBool [] = []
 bitToBool (bit:remainingBits) =
@@ -268,7 +261,7 @@ bitToBool (bit:remainingBits) =
         else [True] ++ bitToBool remainingBits
 
 
---decodeFileCustom :: FilePath -> IO ()
+decodeFileCustom :: FilePath -> IO ()
 decodeFileCustom pathToFile = do
     readData <- decodeFile pathToFile
     let decodedFileContent = readData :: FileContent
@@ -330,3 +323,26 @@ allTests =
 
 allTests :: Test
 allTests = TestList [TestCase testIsConsistent, TestCase testCodingTable, TestCase testEncode, TestCase testDecode]
+
+
+groupToArrays :: Int -> [Bit] -> [[Bit]]
+groupToArrays _ [] = []
+groupToArrays count array
+  | count > 0 = (take count array) : (groupToArrays count (drop count array))
+  | otherwise = error "Negative count"
+
+serializeBits :: [Bit] -> [Word8]
+serializeBits bits = map serialize8Bits (groupToArrays 8 bits)
+  where
+    serialize8Bits :: [Bit] -> Word8
+    serialize8Bits b = z (b!!0) 128 .|. z (b!!1) 64 .|. z (b!!2) 32 .|. z (b!!3) 16 .|. z (b!!4) 8 .|. z (b!!5) 4 .|. z (b!!6) 2 .|. z (b!!7) 1
+      where z Zero _ = 0
+            z One  n = n
+
+deserializeBits :: [Word8] -> [Bit]
+deserializeBits words = concat (map deserialize8Bits words)
+  where
+    deserialize8Bits :: Word8 -> [Bit]
+    deserialize8Bits word = [b 128, b 64, b 32, b 16, b 8, b 4, b 2, b 1]
+      where
+        b z = if (word .&. z == 0) then Zero else One
